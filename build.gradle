@@ -1,0 +1,96 @@
+buildscript {
+	project.ext {
+		bootVersion = '1.2.2.RELEASE'
+		odataVersion = '4.0.0-beta-02-RC01'
+	}
+	repositories {
+		mavenCentral()
+		jcenter()
+	}
+
+	dependencies {
+		classpath "org.springframework.boot:spring-boot-gradle-plugin:${project.bootVersion}"
+		classpath 'se.transmode.gradle:gradle-docker:1.2'
+	}
+}
+
+apply plugin: 'application'
+apply plugin: 'eclipse'
+apply plugin: 'spring-boot'
+apply plugin: 'java'
+apply plugin: 'docker'
+
+
+
+jar {
+	baseName = 'spring-boot-odata'
+	version =  '0.1.0'
+}
+
+repositories {
+	mavenCentral()
+	jcenter()
+}
+
+configurations {
+	cucumberRuntime { extendsFrom testRuntime }
+}
+
+task cucumber() {
+	dependsOn assemble, compileTestJava
+	doLast {
+		javaexec {
+			main = "cucumber.api.cli.Main"
+			classpath = configurations.cucumberRuntime + sourceSets.main.output + sourceSets.test.output
+			args = [
+				'--plugin',
+				'junit:build/cucumber-junit-report/junit.xml',
+				'--plugin',
+				'html:build/cucumber-html-report',
+				'--glue',
+				'com/synerzip/template/springboot',
+				'src/test/resources'
+			]
+		}
+	}
+}
+
+dependencies {
+	compile("org.springframework.boot:spring-boot-starter-web:${project.bootVersion}")
+	compile("org.springframework.boot:spring-boot-starter-actuator:${project.bootVersion}")
+	compile("org.apache.olingo:odata-server-api:${project.odataVersion}")
+	compile("org.apache.olingo:odata-server-core:${project.odataVersion}")
+	compile("org.apache.olingo:odata-commons-api:${project.odataVersion}")
+	compile("org.apache.olingo:odata-commons-core:${project.odataVersion}")
+
+
+	testCompile group: 'junit', name: 'junit', version: '4.+'
+	testCompile ("org.springframework:spring-test:${project.bootVersion}")
+	testCompile ("org.springframework.boot:spring-boot-starter-test:${project.bootVersion}")
+
+
+	testCompile("info.cukes:cucumber-spring:1.2.2")
+	testCompile("info.cukes:cucumber-junit:1.2.2")
+}
+
+group = 'rohitghatol'
+
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+
+docker {
+	baseImage "java:7"
+	maintainer "Rohit Ghatol"
+}
+
+distDocker { exposePort 8080 }
+
+bootRun {
+	jvmArgs = ['-Xdebug', '-Xrunjdwp:server=y,transport=dt_socket,address=4000,suspend=n','-Dspring.profiles.active=dev']
+}
+
+run {
+	jvmArgs = ['-Xdebug', '-Xrunjdwp:server=y,transport=dt_socket,address=4000,suspend=n','-Dspring.profiles.active=dev']
+}
+
+task createWrapper(type: Wrapper) { gradleVersion = '2.0' }

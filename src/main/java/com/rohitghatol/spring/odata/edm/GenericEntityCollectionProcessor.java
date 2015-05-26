@@ -16,10 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.rohitghatol.spring.odata.edm.product;
+package com.rohitghatol.spring.odata.edm;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.olingo.commons.api.data.ContextURL;
 import org.apache.olingo.commons.api.data.Entity;
@@ -46,7 +47,11 @@ import org.apache.olingo.server.api.serializer.SerializerException;
 import org.apache.olingo.server.api.uri.UriInfo;
 import org.apache.olingo.server.api.uri.UriResource;
 import org.apache.olingo.server.api.uri.UriResourceEntitySet;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
+
+import com.rohitghatol.spring.odata.edm.providers.EntityProvider;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -56,12 +61,19 @@ import org.springframework.stereotype.Component;
 public class GenericEntityCollectionProcessor implements
 		EntityCollectionProcessor {
 
+	@Autowired
+	private ApplicationContext ctx;
+
 	/** The odata. */
 	private OData odata;
 
 	// our processor is initialized with the OData context object
-	/* (non-Javadoc)
-	 * @see org.apache.olingo.server.api.processor.Processor#init(org.apache.olingo.server.api.OData, org.apache.olingo.server.api.ServiceMetadata)
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * org.apache.olingo.server.api.processor.Processor#init(org.apache.olingo
+	 * .server.api.OData, org.apache.olingo.server.api.ServiceMetadata)
 	 */
 	public void init(OData odata, ServiceMetadata serviceMetadata) {
 		this.odata = odata;
@@ -72,8 +84,14 @@ public class GenericEntityCollectionProcessor implements
 	// this method is called, when the user fires a request to an EntitySet
 	// in our example, the URL would be:
 	// http://localhost:8080/ExampleService1/ExampleServlet1.svc/Products
-	/* (non-Javadoc)
-	 * @see org.apache.olingo.server.api.processor.EntityCollectionProcessor#readEntityCollection(org.apache.olingo.server.api.ODataRequest, org.apache.olingo.server.api.ODataResponse, org.apache.olingo.server.api.uri.UriInfo, org.apache.olingo.commons.api.format.ContentType)
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see org.apache.olingo.server.api.processor.EntityCollectionProcessor#
+	 * readEntityCollection(org.apache.olingo.server.api.ODataRequest,
+	 * org.apache.olingo.server.api.ODataResponse,
+	 * org.apache.olingo.server.api.uri.UriInfo,
+	 * org.apache.olingo.commons.api.format.ContentType)
 	 */
 	public void readEntityCollection(ODataRequest request,
 			ODataResponse response, UriInfo uriInfo, ContentType responseFormat)
@@ -88,7 +106,7 @@ public class GenericEntityCollectionProcessor implements
 
 		// 2nd: fetch the data from backend for this requested EntitySetName //
 		// it has to be delivered as EntitySet object
-		EntitySet entitySet = getData(edmEntitySet);
+		EntitySet entitySet = getData(uriInfo);
 
 		// 3rd: create a serializer based on the requested format (json)
 		ODataFormat format = ODataFormat.fromContentType(responseFormat);
@@ -116,58 +134,31 @@ public class GenericEntityCollectionProcessor implements
 	/**
 	 * Helper method for providing some sample data.
 	 *
-	 * @param edmEntitySet            for which the data is requested
+	 * @param edmEntitySet
+	 *            for which the data is requested
 	 * @return data of requested entity set
 	 */
-	private EntitySet getData(EdmEntitySet edmEntitySet) {
+	private EntitySet getData(UriInfo uriInfo) {
+		List<UriResource> resourcePaths = uriInfo.getUriResourceParts();
+		UriResourceEntitySet uriResourceEntitySet = (UriResourceEntitySet) resourcePaths
+				.get(0); // in our example, the first segment is the EntitySet
+		EdmEntitySet edmEntitySet = uriResourceEntitySet.getEntitySet();
 
-		EntitySet entitySet = new EntitySetImpl();
-		// check for which EdmEntitySet the data is requested
-		if (GenericEdmProvider.ES_PRODUCTS_NAME.equals(edmEntitySet.getName())) {
-			List<Entity> entityList = entitySet.getEntities();
+		EntitySet entitySet = null;
 
-			// add some sample product entities
-			entityList
-					.add(new EntityImpl()
-							.addProperty(
-									new PropertyImpl(null, "ID",
-											ValueType.PRIMITIVE, 1))
-							.addProperty(
-									new PropertyImpl(null, "Name",
-											ValueType.PRIMITIVE,
-											"Notebook Basic 15"))
-							.addProperty(
-									new PropertyImpl(null, "Description",
-											ValueType.PRIMITIVE,
-											"Notebook Basic, 1.7GHz - 15 XGA - 1024MB DDR2 SDRAM - 40GB")));
+		Map<String, EntityProvider> entityProviders = ctx
+				.getBeansOfType(EntityProvider.class);
 
-			entityList
-					.add(new EntityImpl()
-							.addProperty(
-									new PropertyImpl(null, "ID",
-											ValueType.PRIMITIVE, 2))
-							.addProperty(
-									new PropertyImpl(null, "Name",
-											ValueType.PRIMITIVE, "1UMTS PDA"))
-							.addProperty(
-									new PropertyImpl(null, "Description",
-											ValueType.PRIMITIVE,
-											"Ultrafast 3G UMTS/HSDPA Pocket PC, supports GSM network")));
-
-			entityList
-					.add(new EntityImpl()
-							.addProperty(
-									new PropertyImpl(null, "ID",
-											ValueType.PRIMITIVE, 3))
-							.addProperty(
-									new PropertyImpl(null, "Name",
-											ValueType.PRIMITIVE, "Ergo Screen"))
-							.addProperty(
-									new PropertyImpl(null, "Description",
-											ValueType.PRIMITIVE,
-											"17 Optimum Resolution 1024 x 768 @ 85Hz, resolution 1280 x 960")));
+		for (String entity : entityProviders.keySet()) {
+			EntityProvider entityProvider = entityProviders.get(entity);
+			if (entityProvider
+					.getEntityType().getName()
+					
+					.equals(edmEntitySet.getEntityType().getName())) {
+				entitySet = entityProvider.getEntitySet(uriInfo);
+				break;
+			}
 		}
-
 		return entitySet;
 	}
 

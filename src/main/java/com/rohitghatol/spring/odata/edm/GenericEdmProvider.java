@@ -16,27 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.rohitghatol.spring.odata.edm.product;
+package com.rohitghatol.spring.odata.edm;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.olingo.commons.api.ODataException;
-import org.apache.olingo.commons.api.edm.EdmPrimitiveTypeKind;
 import org.apache.olingo.commons.api.edm.FullQualifiedName;
 import org.apache.olingo.server.api.edm.provider.EdmProvider;
 import org.apache.olingo.server.api.edm.provider.EntityContainer;
 import org.apache.olingo.server.api.edm.provider.EntityContainerInfo;
 import org.apache.olingo.server.api.edm.provider.EntitySet;
 import org.apache.olingo.server.api.edm.provider.EntityType;
-import org.apache.olingo.server.api.edm.provider.Property;
-import org.apache.olingo.server.api.edm.provider.PropertyRef;
 import org.apache.olingo.server.api.edm.provider.Schema;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
+
+import com.rohitghatol.spring.odata.edm.providers.EntityProvider;
 
 @Component
 public class GenericEdmProvider extends EdmProvider {
+
+	@Autowired
+	private ApplicationContext ctx;
 
 	// Service Namespace
 	public static final String NAMESPACE = "com.example.model";
@@ -46,14 +50,6 @@ public class GenericEdmProvider extends EdmProvider {
 	public static final FullQualifiedName CONTAINER = new FullQualifiedName(
 			NAMESPACE, CONTAINER_NAME);
 
-	// Entity Types Names
-	public static final String ET_PRODUCT_NAME = "Product";
-	public static final FullQualifiedName ET_PRODUCT_FQN = new FullQualifiedName(
-			NAMESPACE, ET_PRODUCT_NAME);
-
-	// Entity Set Names
-	public static final String ES_PRODUCTS_NAME = "Products";
-
 	@Override
 	public List<Schema> getSchemas() throws ODataException {
 
@@ -61,9 +57,18 @@ public class GenericEdmProvider extends EdmProvider {
 		Schema schema = new Schema();
 		schema.setNamespace(NAMESPACE);
 
+		Map<String, EntityProvider> entityProviders = ctx
+				.getBeansOfType(EntityProvider.class);
+
 		// add EntityTypes
 		List<EntityType> entityTypes = new ArrayList<EntityType>();
-		entityTypes.add(getEntityType(ET_PRODUCT_FQN));
+		for (String entity : entityProviders.keySet()) {
+
+			EntityProvider entityProvider = entityProviders.get(entity);
+			entityTypes.add(entityProvider.getEntityType());
+
+		}
+
 		schema.setEntityTypes(entityTypes);
 
 		// add EntityContainer
@@ -80,66 +85,76 @@ public class GenericEdmProvider extends EdmProvider {
 	public EntityType getEntityType(FullQualifiedName entityTypeName)
 			throws ODataException {
 
-		// this method is called for one of the EntityTypes that are configured
-		// in the Schema
-		if (entityTypeName.equals(ET_PRODUCT_FQN)) {
+		EntityType result = null;
+		Map<String, EntityProvider> entityProviders = ctx
+				.getBeansOfType(EntityProvider.class);
 
-			// create EntityType properties
-			Property id = new Property().setName("ID").setType(
-					EdmPrimitiveTypeKind.Int32.getFullQualifiedName());
-			Property name = new Property().setName("Name").setType(
-					EdmPrimitiveTypeKind.String.getFullQualifiedName());
-			Property description = new Property()
-					.setName("Description")
-					.setType(EdmPrimitiveTypeKind.String.getFullQualifiedName());
+		for (String entity : entityProviders.keySet()) {
 
-			// create PropertyRef for Key element
-			PropertyRef propertyRef = new PropertyRef();
-			propertyRef.setPropertyName("ID");
+			EntityProvider entityProvider = entityProviders.get(entity);
+			EntityType entityType = entityProvider.getEntityType();
+			if (entityType.getName().equals(entityTypeName.getName())) {
+				result = entityType;
+				break;
+			}
 
-			// configure EntityType
-			EntityType entityType = new EntityType();
-			entityType.setName(ET_PRODUCT_NAME);
-			entityType.setProperties(Arrays.asList(id, name, description));
-			entityType.setKey(Arrays.asList(propertyRef));
-
-			return entityType;
 		}
+		return result;
 
-		return null;
 	}
 
 	@Override
 	public EntitySet getEntitySet(FullQualifiedName entityContainer,
 			String entitySetName) throws ODataException {
 
-		if (entityContainer.equals(CONTAINER)) {
-			if (entitySetName.equals(ES_PRODUCTS_NAME)) {
-				EntitySet entitySet = new EntitySet();
-				entitySet.setName(ES_PRODUCTS_NAME);
-				entitySet.setType(ET_PRODUCT_FQN);
+		EntitySet result = null;
+		Map<String, EntityProvider> entityProviders = ctx
+				.getBeansOfType(EntityProvider.class);
 
-				return entitySet;
+		for (String entity : entityProviders.keySet()) {
+
+			EntityProvider entityProvider = entityProviders.get(entity);
+			EntityType entityType = entityProvider.getEntityType();
+			if (entityProvider.getEntitySetName().equals(entitySetName)) {
+				result = new EntitySet();
+				result.setName(entityProvider.getEntitySetName());
+				result.setType(entityProvider.getFullyQualifiedName());
+				break;
 			}
-		}
 
-		return null;
+		}
+		return result;
+
 	}
 
-	/* (non-Javadoc)
-	 * @see org.apache.olingo.server.api.edm.provider.EdmProvider#getEntityContainer()
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * org.apache.olingo.server.api.edm.provider.EdmProvider#getEntityContainer
+	 * ()
 	 */
 	@Override
 	public EntityContainer getEntityContainer() throws ODataException {
 
 		// create EntitySets
 		List<EntitySet> entitySets = new ArrayList<EntitySet>();
-		entitySets.add(getEntitySet(CONTAINER, ES_PRODUCTS_NAME));
+		
+		Map<String, EntityProvider> entityProviders = ctx
+				.getBeansOfType(EntityProvider.class);
+
+		for (String entity : entityProviders.keySet()) {
+			EntityProvider entityProvider = entityProviders.get(entity);
+			entitySets.add(getEntitySet(CONTAINER, entityProvider.getEntitySetName()));
+		}
+		
+		
 
 		// create EntityContainer
 		EntityContainer entityContainer = new EntityContainer();
 		entityContainer.setName(CONTAINER_NAME);
 		entityContainer.setEntitySets(entitySets);
+		
 
 		return entityContainer;
 	}

@@ -46,7 +46,7 @@ import com.rohitghatol.spring.odata.exception.EdmException;
 @RequestMapping("odata")
 public class EDMController {
 
-	private static String URI = "odata";
+	private static String URI = "odata/";
 	
 	/** The split. */
 	private int split = 0;
